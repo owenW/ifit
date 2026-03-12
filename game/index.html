@@ -3,41 +3,305 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Pocket Commander - 四分卫养成</title>
+<title>Pocket Commander - 四分卫养成 · 腰旗橄榄球</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  background: #1a1a2e;
+  background: #0a0e1a;
   overflow: hidden;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  color: #e0e0e0;
   touch-action: none;
   user-select: none;
 }
-canvas {
-  display: block;
-  margin: 0 auto;
+#ui-layer {
+  position: fixed; top:0; left:0; width:100%; height:100%;
+  pointer-events: none; z-index: 10;
 }
-#loading {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: #1a1a2e;
+#ui-layer > * { pointer-events: auto; }
+canvas#three-canvas { display:block; width:100%; height:100%; }
+
+/* HUD */
+#hud {
+  position:fixed; top:0; left:0; right:0;
+  padding: 8px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+  z-index: 20;
+}
+.hud-score { font-size: 22px; font-weight: bold; }
+.hud-score .you { color: #4fc3f7; }
+.hud-score .opp { color: #ef5350; }
+.hud-info { font-size: 13px; color: #aaa; text-align: center; }
+.hud-down { font-size: 15px; color: #fdd835; font-weight: bold; }
+
+/* Panels */
+.panel {
+  position: fixed;
+  background: rgba(10, 14, 26, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  padding: 20px;
+  display: none;
+  z-index: 30;
+}
+.panel.center {
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 90vw; max-height: 90vh;
+  overflow-y: auto;
+}
+.panel.bottom {
+  bottom: 0; left: 0; right: 0;
+  border-radius: 16px 16px 0 0;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.panel.active { display: block; }
+.panel h2 {
+  font-size: 20px; margin-bottom: 12px; color: #f9a825;
+  text-align: center;
+}
+.panel h3 { font-size: 15px; margin: 10px 0 6px; color: #aaa; }
+
+/* Cards grid */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+.card {
+  background: rgba(255,255,255,0.05);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.card:hover { border-color: #f9a825; transform: translateY(-2px); }
+.card.selected { border-color: #f9a825; background: rgba(249,168,37,0.15); }
+.card .icon { font-size: 28px; margin-bottom: 4px; }
+.card .name { font-size: 14px; font-weight: bold; color: #fff; }
+.card .desc { font-size: 11px; color: #888; margin-top: 4px; }
+.card .tags { margin-top: 6px; }
+.card .tag {
+  display: inline-block; font-size: 9px; padding: 2px 6px;
+  border-radius: 4px; margin: 1px;
+}
+.tag.beat { background: rgba(67,160,71,0.3); color: #81c784; }
+.tag.weak { background: rgba(229,57,53,0.3); color: #ef9a9a; }
+.tag.scout-cold { border: 1px solid #42a5f5; color: #42a5f5; }
+.tag.scout-normal { border: 1px solid #888; color: #888; }
+.tag.scout-hot { border: 1px solid #ffa726; color: #ffa726; }
+.tag.scout-burn { border: 1px solid #ef5350; color: #ef5350; }
+
+/* Strategy panel */
+.strategy-section {
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 8px 0;
+}
+.read-order {
+  display: flex; gap: 8px; align-items: center;
+  flex-wrap: wrap; margin: 8px 0;
+}
+.read-slot {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 2px dashed rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 16px; cursor: pointer;
+  transition: all 0.2s;
+}
+.read-slot.filled { border-style: solid; border-color: #4fc3f7; background: rgba(79,195,247,0.15); }
+.read-arrow { color: #555; font-size: 18px; }
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  padding: 12px 28px;
+  border: none; border-radius: 10px;
+  font-size: 16px; font-weight: bold;
+  cursor: pointer; transition: all 0.15s;
+  font-family: inherit;
+}
+.btn-primary { background: #f9a825; color: #0a0e1a; }
+.btn-primary:hover { background: #fbc02d; transform: scale(1.03); }
+.btn-secondary { background: rgba(255,255,255,0.1); color: #ccc; }
+.btn-secondary:hover { background: rgba(255,255,255,0.15); }
+.btn-danger { background: #c62828; color: #fff; }
+.btn-block { display: block; width: 100%; text-align: center; margin-top: 10px; }
+
+/* Defense cards */
+.def-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px; margin: 10px 0;
+}
+.def-card {
+  background: rgba(229,57,53,0.1);
+  border: 2px solid rgba(229,57,53,0.2);
+  border-radius: 12px; padding: 14px;
+  text-align: center; cursor: pointer;
+  transition: all 0.2s;
+}
+.def-card:hover { border-color: #ef5350; }
+.def-card.selected { border-color: #ef5350; background: rgba(229,57,53,0.25); }
+.def-card .icon { font-size: 24px; }
+.def-card .name { font-size: 14px; font-weight: bold; margin-top: 4px; }
+.def-card .desc { font-size: 10px; color: #999; margin-top: 4px; }
+
+/* Sim overlay */
+#sim-log {
+  position: fixed; bottom: 60px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 16px; font-weight: bold;
+  text-align: center;
+  z-index: 25;
+  display: none;
+  min-width: 200px;
+  transition: opacity 0.3s;
+}
+
+/* Speed control */
+#speed-control {
+  position: fixed; bottom: 12px; right: 16px;
+  z-index: 25; display: none;
+}
+#speed-control button {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #ccc; padding: 6px 14px;
+  border-radius: 6px; cursor: pointer;
+  font-size: 13px; margin-left: 4px;
+}
+#speed-control button.active { background: #f9a825; color: #000; }
+
+/* Title screen */
+#title-screen {
+  position: fixed; top:0;left:0;right:0;bottom:0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  color: #e0e0e0; font-size: 24px; z-index: 999;
+  z-index: 50;
+  background: radial-gradient(ellipse at center, #0d1b2e 0%, #0a0e1a 70%);
 }
-#loading .spinner {
-  width: 50px; height: 50px; border: 4px solid #333;
-  border-top-color: #f9a825; border-radius: 50%;
-  animation: spin 0.8s linear infinite; margin-bottom: 20px;
+#title-screen h1 {
+  font-size: 42px; color: #f9a825;
+  text-shadow: 0 0 30px rgba(249,168,37,0.3);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+#title-screen h1 span { color: #fff; }
+#title-screen .subtitle { color: #888; font-size: 15px; margin: 10px 0 30px; }
+
+/* Animations */
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+.fade-in { animation: fadeIn 0.3s ease-out; }
+.pulse { animation: pulse 1s infinite; }
 </style>
 </head>
 <body>
-<div id="loading">
-  <div class="spinner"></div>
-  <div>Loading Pocket Commander...</div>
+
+<!-- Three.js canvas -->
+<canvas id="three-canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud" style="display:none">
+  <div class="hud-score"><span class="you">YOU 0</span></div>
+  <div>
+    <div class="hud-down">1st & 10</div>
+    <div class="hud-info">Q1 · 球在25码线</div>
+  </div>
+  <div class="hud-score"><span class="opp">OPP 0</span></div>
 </div>
-<canvas id="game"></canvas>
+
+<!-- Simulation log -->
+<div id="sim-log"></div>
+
+<!-- Speed control -->
+<div id="speed-control">
+  <button onclick="setSimSpeed(1)" class="active">1x</button>
+  <button onclick="setSimSpeed(2)">2x</button>
+  <button onclick="setSimSpeed(4)">4x</button>
+</div>
+
+<!-- Title Screen -->
+<div id="title-screen">
+  <div style="font-size:64px;margin-bottom:10px">🏈</div>
+  <h1>POCKET <span>COMMANDER</span></h1>
+  <div class="subtitle">四分卫养成 × Roguelike × 腰旗橄榄球</div>
+  <button class="btn btn-primary" onclick="startGame()" style="font-size:20px;padding:16px 48px">
+    开始游戏
+  </button>
+</div>
+
+<!-- Play Selection Panel -->
+<div id="play-panel" class="panel bottom">
+  <h2>📋 选择进攻战术</h2>
+  <div class="hud-down" id="play-panel-down" style="text-align:center;margin-bottom:8px"></div>
+  <div id="defense-hint" style="text-align:center;font-size:13px;color:#888;margin-bottom:10px"></div>
+  <div class="cards-grid" id="play-cards"></div>
+  
+  <div class="strategy-section" id="read-order-section" style="display:none">
+    <h3>📖 设置阅读顺序（先看谁→后看谁）</h3>
+    <div class="read-order" id="read-order"></div>
+    <p style="font-size:11px;color:#666;margin-top:4px">QB会按这个顺序依次观察接球手，传给第一个出现空档的人</p>
+  </div>
+  
+  <button class="btn btn-primary btn-block" id="snap-btn" style="display:none" onclick="confirmSnap()">
+    📣 确认战术，开球！
+  </button>
+</div>
+
+<!-- Defense Selection Panel -->
+<div id="def-panel" class="panel center" style="width:420px">
+  <h2>🛡️ 防守回合</h2>
+  <p style="text-align:center;font-size:13px;color:#888;margin-bottom:12px">对手持球进攻，选择防守阵型</p>
+  <div class="def-grid" id="def-cards"></div>
+  <button class="btn btn-primary btn-block" id="def-confirm-btn" style="display:none" onclick="confirmDefense()">
+    确认防守
+  </button>
+</div>
+
+<!-- Result Panel -->
+<div id="result-panel" class="panel center" style="width:400px;text-align:center">
+  <div id="result-grade" style="font-size:48px;font-weight:bold;margin:10px 0"></div>
+  <div id="result-message" style="font-size:18px;font-weight:bold;margin:8px 0"></div>
+  <div id="result-detail" style="font-size:13px;color:#888;margin:8px 0"></div>
+  <div id="result-matchup" style="font-size:12px;margin:8px 0"></div>
+  <button class="btn btn-primary btn-block" onclick="continueAfterResult()">继续</button>
+</div>
+
+<!-- Shop Panel -->
+<div id="shop-panel" class="panel center" style="width:500px">
+  <h2>🏪 战术商店</h2>
+  <div id="shop-coins" style="text-align:center;font-size:16px;color:#f9a825;margin-bottom:12px"></div>
+  <div class="cards-grid" id="shop-cards"></div>
+  <button class="btn btn-secondary btn-block" onclick="leaveShop()">▶ 继续赛季</button>
+</div>
+
+<!-- Season Map Panel -->
+<div id="season-panel" class="panel center" style="width:400px">
+  <h2 id="season-title">🏈 赛季 1</h2>
+  <div id="season-stats" style="text-align:center;font-size:13px;color:#888;margin-bottom:12px"></div>
+  <div id="season-games"></div>
+</div>
+
+<!-- Game Over Panel -->
+<div id="gameover-panel" class="panel center" style="width:420px;text-align:center">
+  <div id="go-title" style="font-size:28px;font-weight:bold;margin-bottom:8px"></div>
+  <div id="go-score" style="font-size:36px;font-weight:bold;margin:10px 0"></div>
+  <div id="go-detail" style="font-size:13px;color:#888;margin:10px 0"></div>
+  <button class="btn btn-primary btn-block" id="go-btn" onclick="afterGameOver()">继续</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
